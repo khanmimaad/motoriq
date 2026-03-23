@@ -111,6 +111,26 @@ def run_query(sql: str) -> pd.DataFrame:
     conn.close()
     return df
 
+def generate_insight(question: str, df: pd.DataFrame) -> str:
+    preview = df.head(10).to_string(index=False)
+    row_count = len(df)
+    prompt = (
+        f"A user asked: \"{question}\"\n"
+        f"The database returned {row_count} rows. Here are the first 10:\n\n"
+        f"{preview}\n\n"
+        "Write a concise, enthusiast-level insight (2-4 sentences) interpreting these results. "
+        "Highlight the most interesting findings — standout performers, trends, surprises, or notable specs. "
+        "Write as if you are a knowledgeable automotive journalist, not a data analyst. "
+        "No bullet points. No preamble. Just the insight."
+    )
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=200
+    )
+    return response.choices[0].message.content.strip()
+
 def auto_chart(df: pd.DataFrame, question: str):
     if df.empty or len(df.columns) < 2:
         return None
@@ -163,7 +183,7 @@ def auto_chart(df: pd.DataFrame, question: str):
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 st.title("🏎️ MotorIQ")
-st.markdown("Natural language questions over **70,617 vehicle records** spanning 1904–2029. Powered by GPT-4o → SQL → Plotly.")
+st.markdown("Natural language questions over **71,542 vehicle records** spanning 1904–2029. Powered by GPT-4o → SQL → Plotly.")
 
 st.divider()
 
@@ -194,7 +214,7 @@ query = st.text_input(
 )
 
 if query:
-    with st.spinner("Generating SQL and querying database..."):
+    with st.spinner("Querying database..."):
         try:
             sql = generate_sql(query)
             df = run_query(sql)
@@ -205,6 +225,16 @@ if query:
     if df.empty:
         st.warning("Query returned no results. Try rephrasing.")
     else:
+        # LLM insight
+        with st.spinner("Generating insight..."):
+            try:
+                insight = generate_insight(query, df)
+                st.markdown(f"> {insight}")
+            except Exception:
+                pass
+
+        st.divider()
+
         # Results row
         col1, col2 = st.columns([3, 1])
         with col1:
