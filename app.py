@@ -35,72 +35,81 @@ st.markdown("""
 
 # ── Schema context for GPT ────────────────────────────────────────────────────
 SCHEMA = """
+CRITICAL INSTRUCTION: You must use ONLY the exact column names defined below. Do NOT invent, rename, or substitute column names. The following column names are FORBIDDEN and do not exist in this database: engine_hp, body_style, car_class, displacement_cc, torque_nm, electric_range_km, battery_kwh, weight_kg, engine_cylinders, fuel_economy, mpg. Using any forbidden column name will cause the query to fail.
+
 You are a SQL expert for a SQLite automotive database called motoriq.db.
 It has two tables:
 
 TABLE: vehicles_1945
-  make             TEXT    -- manufacturer (e.g. 'Ferrari', 'Bmw', 'Ford')
+  make             TEXT    -- manufacturer (e.g. 'Ferrari', 'BMW', 'Ford')
   model            TEXT    -- model name
   year             INTEGER -- production year (1904-2020)
-  body_style       TEXT    -- e.g. 'Sedan', 'Coupe', 'SUV', 'Convertible'
-  seats            REAL
-  doors            REAL
-  engine_hp        REAL    -- horsepower
-  engine_cylinders REAL
-  displacement_cc  REAL    -- engine displacement in cc
-  torque_nm        REAL    -- torque in newton-meters
-  fuel_type        TEXT    -- e.g. 'Gasoline', 'Diesel', 'Electric'
-  boost_type       TEXT    -- e.g. 'Turbo', 'Supercharger', NULL if naturally aspirated
-  drive_type       TEXT    -- e.g. 'Rear', 'Front', 'All'
+  body             TEXT    -- body style e.g. 'Sedan', 'Coupe', 'SUV', 'Convertible'
+  seats            INTEGER
+  doors            INTEGER
+  hp               INTEGER -- horsepower
+  engine           TEXT    -- number of cylinders e.g. '4', '6', '8', '12'
+  displacement     REAL    -- engine displacement in cc
+  torque           INTEGER -- torque in lb-ft
+  powertrain       TEXT    -- e.g. 'Gasoline', 'Diesel', 'Electric', 'Hybrid'
+  boost            TEXT    -- e.g. 'Turbo', 'Supercharger', NULL if naturally aspirated
+  drivetrain       TEXT    -- e.g. 'Rear', 'Front', 'All'
   transmission     TEXT    -- e.g. 'Manual', 'Automatic'
-  gears            REAL
-  accel_0_100_s    REAL    -- 0-100 km/h in seconds (lower = faster)
-  top_speed_kph    REAL    -- top speed in km/h
+  gears            INTEGER
+  zerotosixty      REAL    -- 0-60 mph in seconds (lower = faster)
+  top_speed        INTEGER -- top speed in kph
   mixed_fuel_l100km REAL   -- fuel consumption L/100km
   co2_g_per_km     REAL
-  electric_range_km REAL   -- for EVs
-  battery_kwh      REAL    -- for EVs
-  weight_kg        REAL
-  country          TEXT    -- country of origin
-  car_class        TEXT
-  cylinder_layout  TEXT    -- e.g. 'V', 'Inline', 'Boxer'
+  electric_range   INTEGER -- EV range in km
+  battery_capacity INTEGER -- battery size in kWh for EVs
+  weight           INTEGER -- curb weight in kg
+  country          TEXT    -- country of origin e.g. 'Germany', 'Italy', 'Japan', 'USA'
+  class            TEXT    -- vehicle class
+  engine2          TEXT    -- cylinder layout e.g. 'V', 'Inline', 'Boxer'
   engine_placement TEXT    -- e.g. 'Front', 'Mid', 'Rear'
+  source           TEXT    -- always '1945_2020' for this table
+  codename         TEXT    -- internal model codename e.g. 'E46', 'MX-5', 'G80', NULL if unknown
 
 TABLE: vehicles_msrp
   make             TEXT
   model            TEXT
   year             INTEGER -- 1990-2017
-  fuel_type        TEXT
-  engine_hp        REAL
-  engine_cylinders REAL
-  transmission     TEXT
-  drive_type       TEXT
-  doors            REAL
-  market_category  TEXT    -- e.g. 'Luxury', 'Performance', 'High-Performance'
-  vehicle_size     TEXT    -- 'Compact', 'Midsize', 'Large'
-  body_style       TEXT
+  fuel_type        TEXT    -- e.g. 'premium unleaded (required)', 'regular unleaded'
+  hp               INTEGER -- horsepower
+  engine           TEXT    -- number of cylinders
+  transmission     TEXT    -- e.g. 'MANUAL', 'AUTOMATIC'
+  drivetrain       TEXT    -- e.g. 'rear wheel drive', 'all wheel drive', 'front wheel drive'
+  doors            INTEGER
+  market           TEXT    -- e.g. 'Luxury', 'Performance', 'High-Performance', 'Exotic'
+  size             TEXT    -- 'Compact', 'Midsize', 'Large'
+  body             TEXT    -- body style
   highway_mpg      REAL
   city_mpg         REAL
-  popularity       REAL
+  popularity       REAL    -- search popularity score from Edmunds
   msrp             REAL    -- manufacturer suggested retail price in USD
+  source           TEXT    -- always 'msrp' for this table
 
 RULES:
-- Always use SELECT statements only, never INSERT/UPDATE/DELETE
+- Always use SELECT statements only, never INSERT, UPDATE, or DELETE
 - Limit results to 50 rows unless the user asks for more
 - For decade analysis use: CAST(year/10 AS INT)*10 AS decade
 - For averages always ROUND to 2 decimal places
-- Use LOWER(make) for case-insensitive make comparisons
-- vehicles_1945 has depth (1904-2020) and performance specs
-- vehicles_msrp has MSRP and market_category but only 1990-2017
-- When the question involves MSRP or market category, use vehicles_msrp
-- When the question involves torque, displacement, acceleration, top speed, use vehicles_1945
+- makes in vehicles_1945 are properly title-cased (e.g. 'BMW', 'Ferrari', 'Mercedes-Benz') -- use exact equality: make = 'BMW', NOT LOWER(make) = 'bmw'
+- makes in vehicles_msrp may vary in casing -- use LOWER(make) only when querying vehicles_msrp
+- NEVER use fuel_type when querying vehicles_1945 -- that column does not exist in vehicles_1945. Use powertrain instead (e.g. powertrain = 'Electric', powertrain = 'Hybrid', powertrain = 'Gasoline')
+- NEVER use powertrain when querying vehicles_msrp -- that column does not exist in vehicles_msrp. Use fuel_type instead
+- vehicles_1945 has depth (1904-2020) and performance specs: hp, torque, displacement, zerotosixty, top_speed, boost, weight, codename
+- vehicles_msrp has MSRP and market category but only covers 1990-2017
+- When the question involves MSRP, market category, or popularity use vehicles_msrp
+- When the question involves torque, displacement, zerotosixty, top_speed, boost, weight, electric_range, codename use vehicles_1945
+- For general hp or year range questions prefer vehicles_1945 as it has more records
 - Return only the raw SQL query with no explanation, no markdown, no backticks
 """
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def generate_sql(question: str) -> str:
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": SCHEMA},
             {"role": "user", "content": question}
@@ -135,16 +144,18 @@ def auto_chart(df: pd.DataFrame, question: str):
     # Time series
     if "year" in cols or "decade" in cols:
         x_col = "decade" if "decade" in cols else "year"
+        color_col = next((c for c in text_cols if c != x_col), None)
+        df[x_col] = df[x_col].astype(str)
         fig = px.line(
             df, x=x_col, y=y_col,
-            color=text_cols[0] if len(text_cols) > 1 else None,
+            color=color_col,
             markers=True,
             template="plotly_dark",
             title=question.capitalize()
         )
         return fig
 
-    # Scatter with two numeric axes
+    # Scatter
     if len(numeric_cols) >= 2 and ("vs" in q or "compare" in q or "correlation" in q):
         fig = px.scatter(
             df, x=numeric_cols[0], y=numeric_cols[1],
@@ -155,7 +166,7 @@ def auto_chart(df: pd.DataFrame, question: str):
         )
         return fig
 
-    # Bar for most other cases
+    # Bar
     fig = px.bar(
         df.head(30), x=x_col, y=y_col,
         color=text_cols[1] if len(text_cols) > 1 else None,
@@ -175,9 +186,9 @@ st.divider()
 st.markdown("**Try asking:**")
 examples = [
     "How has average horsepower changed by decade for Ferrari?",
-    "Which turbocharged cars have the fastest 0-100 times?",
+    "Which turbocharged cars have the fastest 0-60 times?",
     "Compare average horsepower of German vs Italian vs American makes since 1980",
-    "What is the average MSRP of rear-wheel drive performance cars by make?",
+    "What is the average MSRP of rear wheel drive performance cars by make?",
     "Show the top 20 highest horsepower cars of all time",
     "How does average torque compare between V8 and V12 engines by decade?",
 ]
@@ -223,6 +234,19 @@ if query:
 
         # Chart
         fig = auto_chart(df, query)
+        if "decade" in df.columns or "year" in df.columns:
+            x_col = "decade" if "decade" in df.columns else "year"
+            numeric_cols = df.select_dtypes(include="number").columns.tolist()
+            text_cols = df.select_dtypes(include="object").columns.tolist()
+            y_col = next((c for c in numeric_cols if c != x_col), None)
+            color_col = next((c for c in df.columns if c not in numeric_cols and c != x_col), None)
+            fig = px.line(
+                df, x=x_col, y=y_col,
+                color=color_col,
+                markers=True,
+                template="plotly_dark",
+                title=query.capitalize()
+            )
         if fig:
             st.plotly_chart(fig, use_container_width=True)
 
