@@ -51,7 +51,7 @@ TABLE: vehicles_1945
   engine           TEXT    -- number of cylinders e.g. '4', '6', '8', '12'
   displacement     REAL    -- engine displacement in cc
   torque           INTEGER -- torque in lb-ft
-  powertrain       TEXT    -- e.g. 'Gasoline', 'Diesel', 'Electric', 'Hybrid', 'ICE', 'Petrol'
+  powertrain       TEXT    -- casing is inconsistent: common values are 'gasoline', 'diesel', 'electric', 'hybrid' (lowercase) -- always use LOWER(powertrain) for filtering e.g. LOWER(powertrain) = 'electric', LOWER(powertrain) = 'gasoline'
   boost            TEXT    -- e.g. 'Turbo', 'Supercharger', NULL if naturally aspirated
   drivetrain       TEXT    -- values vary: 'Rear wheel drive', 'RWD', 'Front wheel drive', 'FWD', 'All wheel drive (AWD)', 'AWD', 'Four wheel drive (4WD)' -- always use LIKE for filtering e.g. drivetrain LIKE '%Rear%' OR drivetrain LIKE '%RWD%'
   transmission     TEXT    -- e.g. 'Manual', 'Automatic'
@@ -80,7 +80,7 @@ RULES:
 - For decade analysis use: CAST(year/10 AS INT)*10 AS decade
 - For averages always ROUND to 2 decimal places
 - makes are title-cased -- always use exact equality: make = 'BMW', make = 'Ferrari'. NEVER use LOWER(make)
-- Use powertrain to filter by fuel type (e.g. powertrain = 'Electric', powertrain = 'Gasoline', powertrain = 'ICE'). NEVER use fuel_type -- that column does not exist
+- powertrain casing is inconsistent across records -- always use LOWER(powertrain) for filtering: LOWER(powertrain) = 'electric', LOWER(powertrain) = 'gasoline', LOWER(powertrain) = 'diesel', LOWER(powertrain) = 'hybrid'. NEVER use fuel_type -- that column does not exist
 - drivetrain values are inconsistent strings -- always use LIKE: (drivetrain LIKE '%Rear%' OR drivetrain LIKE '%RWD%') for rear-wheel drive, (drivetrain LIKE '%Front%' OR drivetrain LIKE '%FWD%') for front-wheel drive, (drivetrain LIKE '%All%' OR drivetrain LIKE '%AWD%') for all-wheel drive
 - market is a comma-delimited string -- always use LIKE: market LIKE '%Performance%', market LIKE '%Luxury%', market LIKE '%Exotic%'
 - msrp, market, and popularity are NULL for most records -- always add WHERE msrp IS NOT NULL when filtering or aggregating on msrp
