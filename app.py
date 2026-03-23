@@ -43,7 +43,7 @@ It has one table:
 TABLE: vehicles_1945
   make             TEXT    -- manufacturer, title-cased: 'BMW', 'Ferrari', 'Ford', 'Mercedes-Benz'
   model            TEXT    -- model name e.g. '3 Series', 'Mustang', '911'
-  year             INTEGER -- production year (1904-2026)
+  year             INTEGER -- production year (1904-2030)
   body             TEXT    -- body style e.g. 'Sedan', 'Coupe', 'SUV', 'Convertible'
   seats            INTEGER
   doors            INTEGER
@@ -51,7 +51,7 @@ TABLE: vehicles_1945
   engine           TEXT    -- number of cylinders e.g. '4', '6', '8', '12'
   displacement     REAL    -- engine displacement in cc
   torque           INTEGER -- torque in lb-ft
-  powertrain       TEXT    -- e.g. 'Gasoline', 'Diesel', 'Electric', 'Hybrid', 'Petrol'
+  powertrain       TEXT    -- e.g. 'Gasoline', 'Diesel', 'Electric', 'Hybrid', 'ICE', 'Petrol'
   boost            TEXT    -- e.g. 'Turbo', 'Supercharger', NULL if naturally aspirated
   drivetrain       TEXT    -- e.g. 'Rear', 'Front', 'All'
   transmission     TEXT    -- e.g. 'Manual', 'Automatic'
@@ -71,7 +71,7 @@ TABLE: vehicles_1945
   msrp             REAL    -- manufacturer suggested retail price in USD, NULL if unknown
   market           TEXT    -- market category e.g. 'Luxury', 'Performance', 'High-Performance', 'Exotic'
   popularity       REAL    -- Edmunds search popularity score, NULL if unknown
-  codename         TEXT    -- internal model codename e.g. 'E46', 'MX-5', 'G80', NULL if unknown
+  codename         TEXT    -- internal model codename e.g. 'E46', 'MX-5', 'G87', NULL if unknown
 
 RULES:
 - There is only ONE table: vehicles_1945. Never reference any other table.
@@ -80,9 +80,15 @@ RULES:
 - For decade analysis use: CAST(year/10 AS INT)*10 AS decade
 - For averages always ROUND to 2 decimal places
 - makes are title-cased -- always use exact equality: make = 'BMW', make = 'Ferrari'. NEVER use LOWER(make)
-- Use powertrain to filter by fuel type (e.g. powertrain = 'Electric', powertrain = 'Gasoline'). NEVER use fuel_type -- that column does not exist
+- Use powertrain to filter by fuel type (e.g. powertrain = 'Electric', powertrain = 'Gasoline', powertrain = 'ICE'). NEVER use fuel_type -- that column does not exist
 - msrp, market, and popularity are NULL for most records -- always add WHERE msrp IS NOT NULL when filtering or aggregating on msrp
+- COLUMN ORDER: When returning individual vehicle records (not aggregations or analytics), always SELECT columns in this exact order first, then append any additional columns the query requires after zerotosixty:
+    year, make, codename, "class", model, weight, country, doors, seats, drivetrain, body, engine_placement, displacement, boost, engine, powertrain, gears, transmission, hp, torque, top_speed, zerotosixty
 - Return only the raw SQL query with no explanation, no markdown, no backticks
+
+EXAMPLE -- a well-formed individual vehicle record query and what the returned row represents:
+Query: SELECT year, make, codename, "class", model, weight, country, doors, seats, drivetrain, body, engine_placement, displacement, boost, engine, powertrain, gears, transmission, hp, torque, top_speed, zerotosixty FROM vehicles_1945 WHERE make = 'BMW' AND model = 'M2' AND year = 2023 LIMIT 1
+Result row represents: the 2023 BMW G87 2 Series M2, a 3800 lbs German 2-door 2-seat RWD coupe featuring a front-engine 3.0L twin-turbocharged straight-six gasoline engine mated to either a 6-speed manual or 8-speed automatic making 453 hp / 406 lb-ft torque for up to 177 mph top speed and a 0-60 under 3.7 sec
 """
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -157,7 +163,7 @@ def auto_chart(df: pd.DataFrame, question: str):
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 st.title("🏎️ MotorIQ")
-st.markdown("Natural language questions over **71,542 vehicle records** spanning 1904–2029. Powered by GPT-4o → SQL → Plotly.")
+st.markdown("Natural language questions over **70,617 vehicle records** spanning 1904–2029. Powered by GPT-4o → SQL → Plotly.")
 
 st.divider()
 
